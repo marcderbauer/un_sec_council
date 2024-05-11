@@ -1,0 +1,12 @@
+# Dev
+.vscode
+__pycache__
+venv
+.DS_Store
+
+# Data
+source/
+source_subset/
+*.pdf
+extracted/
+*.txt
