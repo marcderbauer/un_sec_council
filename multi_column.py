@@ -51,9 +51,26 @@ Usage
       print(page.get_text(clip=rect, sort=True))
   ----------------------------------------------------------------------------------
 """
-import os
 import sys
 import fitz
+
+
+def get_pages(doc) -> list[str]:
+    pages = []
+
+    for page in doc:
+        bboxes = column_boxes(
+            page, footer_margin=80, header_margin=80, no_image_text=True
+        )
+        page_text = []
+
+        for rect in bboxes:
+            text = page.get_text(clip=rect, sort=True)
+            page_text.append(text)
+
+        pages.append(page_text)
+
+    return pages
 
 
 def column_boxes(page, footer_margin=50, header_margin=50, no_image_text=True):

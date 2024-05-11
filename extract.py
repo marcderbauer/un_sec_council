@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import re
 import fitz
-from multi_column import column_boxes
+from multi_column import get_pages
 from io_utils import get_files_from_folder
 
 
@@ -75,24 +75,6 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     }
 
     return metadata
-
-
-def get_pages(doc) -> list[str]:
-    pages = []
-
-    for page in doc:
-        bboxes = column_boxes(
-            page, footer_margin=80, header_margin=80, no_image_text=True
-        )
-        page_text = []
-
-        for rect in bboxes:
-            text = page.get_text(clip=rect, sort=True)
-            page_text.append(text)
-
-        pages.append(page_text)
-
-    return pages
 
 
 def get_text_indices_with_speakers(matches, text) -> list[tuple[str, str, str]]:
