@@ -102,12 +102,12 @@ def get_text_indices_with_speakers(matches, text) -> list[tuple[str, str, str]]:
 
 
 def split_text_by_speakers(text: str) -> list[dict[str, str]]:
-    title = r"(?P<Title>Mrs?\.|Dame)"
+    title = r"(?P<Title>((Mr|Mr|Ms).|Dame))"
     person = r"(?P<Person>[A-Za-zÀ-ȕ\ ]+)"
     country = r"(?P<Country>\([A-Za-zÀ-ȕ\ ]+\))"
-    language = r"(?P<Language>\([A-Za-zÀ-ȕ\ ]+\))"
+    language = r"(?P<Language>\(spoke in [A-Za-zÀ-ȕ\ ]+\))"
 
-    speaker_regex = f"\n?({title} ?{person} ?{country}? ?{language}?|The President):"
+    speaker_regex = f"\n?(({title} ?{person} ?{country}?|The President) ?{language}?):"
     matches = re.finditer(speaker_regex, text)
 
     text_indices_with_speakers = get_text_indices_with_speakers(matches, text)
@@ -139,7 +139,7 @@ def process_doc(doc) -> dict:
 
 if __name__ == "__main__":
     # files = get_files_from_folder("source_subset")
-    files = ["S_PV.4541.pdf"]
+    files = ["S_PV.4521.pdf", "S_PV.4541.pdf"]
     extracted_folder = Path("extracted")
 
     for filename in files:
