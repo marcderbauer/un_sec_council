@@ -319,7 +319,9 @@ if __name__ == "__main__":
         page.wrap_contents()
 
         # get the text bboxes
-        bboxes = column_boxes(page, footer_margin=footer_margin, header_margin=header_margin)
+        bboxes = column_boxes(
+            page, footer_margin=footer_margin, header_margin=header_margin
+        )
 
         # prepare a canvas to draw rectangles and text
         shape = page.new_shape()

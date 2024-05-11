@@ -6,10 +6,14 @@ from sentence_transformers.quantization import quantize_embeddings
 dimensions = 512
 
 # 2. load model
-model = SentenceTransformer("mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions)
+model = SentenceTransformer(
+    "mixedbread-ai/mxbai-embed-large-v1", truncate_dim=dimensions
+)
 
 
-def get_embedding(text: str, use_case: str = "clustering", quantize: bool = True) -> str:
+def get_embedding(
+    text: str, use_case: str = "clustering", quantize: bool = True
+) -> str:
     prompt = f"Represent this sentence for {use_case}: {text}"
     embedding = model.encode(prompt)
 
@@ -17,6 +21,7 @@ def get_embedding(text: str, use_case: str = "clustering", quantize: bool = True
         return quantize_embeddings(embedding, precision="ubinary")
 
     return embedding
+
 
 # * Only for reference, can probably remove
 def get_similarity(embedding_1, embedding_2):

@@ -17,8 +17,9 @@ RE_MISSING_FILE = "https?:\/\/daccess-ods\.un\.org\/tmp\/.+\.html"
 import logging
 import sys
 
-logging.getLogger('requests').setLevel(logging.WARNING)
-logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 
 def setup_logging():
     # Create a logger
@@ -26,7 +27,7 @@ def setup_logging():
     logger.setLevel(logging.DEBUG)
 
     # Create formatter
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
     # Create a handler for stdout (console)
     console_handler = logging.StreamHandler(sys.stdout)
@@ -35,12 +36,13 @@ def setup_logging():
     logger.addHandler(console_handler)
 
     # Create a handler for file
-    file_handler = logging.FileHandler('logfile.txt')
+    file_handler = logging.FileHandler("logfile.txt")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
     return logger
+
 
 def get_meetings(response) -> list[dict[str, str]]:
     soup = BeautifulSoup(response.content, "html.parser")
@@ -90,8 +92,8 @@ def scrape_pdfs_from_un_security_council_page(
 
     if not response.status_code == 200:
         logger.error(
-            f"Failed to retrieve data from the website. Status code {response.status_code}" +
-            f"url: {url}"
+            f"Failed to retrieve data from the website. Status code {response.status_code}"
+            + f"url: {url}"
         )
         return None
 
@@ -104,7 +106,9 @@ def scrape_pdfs_from_un_security_council_page(
             logger.warning(f"FILE MISSING - Failed to download {meeting_dict['name']}")
         elif re.match(RE_DIGITAL_LIBRARY, meeting_link):
             meeting_dict["pdf_link"] = get_pdf_link_from_digital_library(meeting_dict)
-            logger.info(f"Replaced link for {meeting_dict['name']}") # TODO: don't use f-strings for logging
+            logger.info(
+                f"Replaced link for {meeting_dict['name']}"
+            )  # TODO: don't use f-strings for logging
 
         with requests.Session() as session:
             try:
@@ -138,7 +142,9 @@ def download_pdfs_from_un_security_council_page(url: str, folder: str) -> None:
 def main():
     meeting_dicts_all = []
     try:
-        for i in range(1, 211):  # Everything within the last 25 years (as of 23.03.2024)
+        for i in range(
+            1, 211
+        ):  # Everything within the last 25 years (as of 23.03.2024)
             logger.info(f"============PAGE {i}============")
             url = f"{BASE_URL}{i}"
             meeting_dicts_all += download_pdfs_from_un_security_council_page(
