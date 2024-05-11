@@ -10,7 +10,8 @@ def replace_newlines(text: str) -> str:
     return re.sub("\s+", " ", text)
 
 
-def _is_communique_of_closed_meeting(text: str) -> bool:
+def _is_communique_of_closed_meeting(page_zero) -> bool:
+    text = " ".join(page_zero)
     if re.search("Official communiqué of the \d+\w+ \(closed\) meeting", text):
         return True
     return False
@@ -18,10 +19,6 @@ def _is_communique_of_closed_meeting(text: str) -> bool:
 
 def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     text = "\n".join(first_page)
-
-    if _is_communique_of_closed_meeting(text):
-        # * In case of official communiqué. Would still want to extract some metadata in other function
-        return {}
 
     # ! Note: Can extract more info from here still
     speaker_to_country = (
@@ -78,9 +75,12 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
 
 
 def get_text_indices_with_speakers(matches, text) -> list[tuple[str, str, str]]:
-    text_indices_with_speakers = []
     matches = list(matches)
 
+    if not matches:
+        return []
+
+    text_indices_with_speakers = []
     text_indices_with_speakers.append((0, matches[0].start(), "Intro"))
 
     for match_index, match in enumerate(matches):
@@ -119,14 +119,18 @@ def split_text_by_speakers(text: str) -> list[dict[str, str]]:
 
         parts.append({"speaker": speaker, "text": replace_newlines(part)})
 
-        print(part)
-        print("\n-------------\n")
+        # print(part)
+        # print("\n-------------\n")
 
     return parts
 
 
 def process_doc(doc) -> dict:
     pages = get_pages(doc)
+
+    if _is_communique_of_closed_meeting(pages[0]):
+        print(f"Skipping {doc.name}")
+        return {}
 
     metadata = extract_metadata(pages[0])
     # TODO: Extract text cleaning (newlines, etc.) into own function and apply to text_full as well...
