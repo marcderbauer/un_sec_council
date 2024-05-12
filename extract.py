@@ -1,9 +1,58 @@
+from datetime import datetime
 import json
 from pathlib import Path
 import re
 import fitz
 from multi_column import get_pages
 from io_utils import get_files_from_folder
+
+
+def get_time_str(text: str) -> str:
+    re_day = r"(?P<day>\d{1,2})"
+    re_month = r"(?P<month>(\w+))"
+    re_year = r"(?P<year>\d{4})"
+    re_hour = r"(?P<hour>\d{1,2})"
+    re_minute = r"(?P<minute>\d{1,2})"
+    re_daytime = r"(?P<daytime>a|p)"
+
+    time_regex = re.compile(
+        f"{re_day} {re_month} {re_year}(, {re_hour}\.?{re_minute} {re_daytime})?"
+    )
+
+    match = re.search(time_regex, text)
+
+    months = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
+
+    day = int(match.group("day"))
+    month_str = match.group("month")
+    month = months.index(month_str) + 1
+    year = int(match.group("year"))
+
+    if match.group("hour"):
+        hour = int(match.group("hour"))
+        minute = int(match.group("minute"))
+        if match.group("daytime") == "p":
+            hour += 12
+    else:
+        hour = 0
+        minute = 0
+
+    time = datetime(year, month, day, hour, minute)
+
+    return str(time)
 
 
 def replace_newlines(text: str) -> str:
