@@ -125,20 +125,43 @@ def split_text_by_speakers(text: str) -> list[dict[str, str]]:
     return parts
 
 
+def get_pdf_type(title: str, first_page: list[str]) -> str:
+    if re.search("Resumption", title):
+        return "resumption"
+
+    if re.search(r"S_\d{4}_\d+", title):
+        return "letter"
+
+    if re.search("Agenda", title):
+        return "agenda"
+
+    if _is_communique_of_closed_meeting(first_page):
+        return "communique"
+
+    return "transcript"
+
+
 def process_doc(doc) -> dict:
     pages = get_pages(doc)
 
-    if _is_communique_of_closed_meeting(pages[0]):
-        print(f"Skipping {doc.name}")
-        return {}
+    pdf_type = get_pdf_type(doc.name, pages[0])
 
-    metadata = extract_metadata(pages[0])
-    # TODO: Extract text cleaning (newlines, etc.) into own function and apply to text_full as well...
-    text_full = "".join(["".join(page) for page in pages[1:]])
-    parts = split_text_by_speakers(text_full)
+    if pdf_type == "transcript":
+        # TODO: Make metadata extraction dependent on PDF type
+        metadata = extract_metadata(pages[0])
 
-    report_dict = {**metadata, "by_speaker": parts, "text": replace_newlines(text_full)}
-    return report_dict
+        # TODO: Extract text cleaning (newlines, etc.) into own function and apply to text_full as well...
+        text_full = "".join(["".join(page) for page in pages[1:]])
+        parts = split_text_by_speakers(text_full)
+
+        report_dict = {
+            **metadata,
+            "by_speaker": parts,
+            "text": replace_newlines(text_full),
+        }
+        return report_dict
+
+    return {}
 
 
 if __name__ == "__main__":
