@@ -83,9 +83,9 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     regex_members = "Members:(\\n)?"
     regex_agenda = "Agenda(\\n)?"
     regex_disclaimer = "This record .+"
-    regex_person_and_country = "(?P<Title>Mrs?\.|Dame|Miss|Sir) (?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)(\\n)(?P<Country>[A-Za-zÀ-ȕ ]+)"
+    regex_person_and_country = "(?P<Title>Mr?s?\.|Dame|Miss|Sir) (?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)(\\n)(?P<Country>[A-Za-zÀ-ȕ ]+)"
 
-    meeting_number = re.search(regex_meeting_number, first_page[0]).group(1)
+    meeting_number = re.search(regex_meeting_number, text).group(1)
 
     # TODO: Separate getting indices from actual matching in text
     # TODO: Move all the regexes out of the code below
@@ -95,7 +95,7 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     president_str_index = re.search(regex_members, text).start()
     president_text = text[meta_str_index:president_str_index]
     president_match = re.search(
-        "(?<=President:\n)(?P<Title>Mrs?\.|Dame|Miss|Sir) ?(?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)",
+        "(?<=President:\n)(?P<Title>Mr?s?\.|Dame|Miss|Sir) ?(?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)",
         president_text,
     )
     president = president_match.group("Title") + " " + president_match.group("Person")
@@ -201,6 +201,10 @@ def process_doc(doc) -> dict:
 
     pdf_type = get_pdf_type(doc.name, pages[0])
 
+    if not pages[0]:
+        print(f"Failed to extract {doc.name}")
+        return {}
+
     if pdf_type in ["transcript", "resumption"]:
         # TODO: Make metadata extraction dependent on PDF type
         metadata = extract_metadata(pages[0])
@@ -215,22 +219,20 @@ def process_doc(doc) -> dict:
             "by_speaker": parts,
             "text": replace_newlines(text_full),
         }
-        return report_dict
-
     else:
         report_dict = {"type": pdf_type}
 
-    return {}
+    return report_dict
 
 
 if __name__ == "__main__":
-    # files = get_files_from_folder("source_subset")
-    files = ["S_PV.4291.pdf"]
+    files = get_files_from_folder("source")
+    files = ["S_PV.8995.pdf"]
     extracted_folder = Path("extracted")
 
     for filename in files:
         print(filename)
-        doc = fitz.open(f"source_subset/{filename}")
+        doc = fitz.open(f"source/{filename}")
 
         report_dict = process_doc(doc)
         output_path = extracted_folder / f"{str(Path(filename).stem)}{'.json'}"
