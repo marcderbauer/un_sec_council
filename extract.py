@@ -61,26 +61,29 @@ def replace_newlines(text: str) -> str:
 
 def _is_communique_of_closed_meeting(page_zero) -> bool:
     text = " ".join(page_zero)
-    if re.search("Official communiqué of the \d+\w+ \(closed\) meeting", text):
+    if re.search("Official communiqu[ée]", text, re.I):
         return True
     return False
 
 
 def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     text = "\n".join(first_page)
-
+    text = text.replace(
+        "United Kingdom of Great Britain\nand Northern Ireland",
+        "United Kingdom of Great Britain and Northern Ireland",
+    )
+    text = text.replace(" \n", "\n")
     # ! Note: Can extract more info from here still
     speaker_to_country = (
         {}
     )  # Not comprehensive, can have unlisted speakers such as Mr. Wennesland at S/PV.9556
-    # text = first_page[2]
 
-    regex_meeting_number = "(\d{1,4})(st|rd|th) meeting"
+    regex_meeting_number = "(\d{1,4})(st|nd|rd|th) [Mm]eeting"
     regex_president = "President:(\n)?"
     regex_members = "Members:(\\n)?"
     regex_agenda = "Agenda(\\n)?"
     regex_disclaimer = "This record .+"
-    regex_person_and_country = "(?P<Title>Mrs?\.|Dame) (?P<Person>[A-Za-zÀ-ȕ ]+)(\\n)(?P<Country>[A-Za-zÀ-ȕ ]+)"
+    regex_person_and_country = "(?P<Title>Mrs?\.|Dame|Miss|Sir) (?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)(\\n)(?P<Country>[A-Za-zÀ-ȕ ]+)"
 
     meeting_number = re.search(regex_meeting_number, first_page[0]).group(1)
 
@@ -92,7 +95,7 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
     president_str_index = re.search(regex_members, text).start()
     president_text = text[meta_str_index:president_str_index]
     president_match = re.search(
-        "(?<=President:\n)(?P<Title>Mrs?\.|Dame) ?(?P<Person>[A-Za-zÀ-ȕ-]+)",
+        "(?<=President:\n)(?P<Title>Mrs?\.|Dame|Miss|Sir) ?(?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)",
         president_text,
     )
     president = president_match.group("Title") + " " + president_match.group("Person")
@@ -105,7 +108,7 @@ def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
 
     agenda_str_index = re.search(regex_disclaimer, text).start()
     agenda_text = text[members_str_index:agenda_str_index]
-    agenda = re.search("(?<=Agenda\n)(.+)($|\n)", agenda_text).group(1)
+    agenda = re.search("(?<=Agenda\n)((.|\n)+)($|\n)", agenda_text).group(1)
 
     for match in re.finditer(regex_person_and_country, members_text):
         speaker = match.group("Title") + " " + match.group("Person")
@@ -175,6 +178,9 @@ def split_text_by_speakers(text: str) -> list[dict[str, str]]:
 
 
 def get_pdf_type(title: str, first_page: list[str]) -> str:
+    if re.search("Corr", title):
+        return "correction"
+
     if re.search("Resumption", title):
         return "resumption"
 
@@ -195,7 +201,7 @@ def process_doc(doc) -> dict:
 
     pdf_type = get_pdf_type(doc.name, pages[0])
 
-    if pdf_type == "transcript":
+    if pdf_type in ["transcript", "resumption"]:
         # TODO: Make metadata extraction dependent on PDF type
         metadata = extract_metadata(pages[0])
 
@@ -204,21 +210,26 @@ def process_doc(doc) -> dict:
         parts = split_text_by_speakers(text_full)
 
         report_dict = {
+            "type": pdf_type,
             **metadata,
             "by_speaker": parts,
             "text": replace_newlines(text_full),
         }
         return report_dict
 
+    else:
+        report_dict = {"type": pdf_type}
+
     return {}
 
 
 if __name__ == "__main__":
     # files = get_files_from_folder("source_subset")
-    files = ["S_PV.4521.pdf", "S_PV.4541.pdf"]
+    files = ["S_PV.4291.pdf"]
     extracted_folder = Path("extracted")
 
     for filename in files:
+        print(filename)
         doc = fitz.open(f"source_subset/{filename}")
 
         report_dict = process_doc(doc)
