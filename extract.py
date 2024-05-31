@@ -6,8 +6,13 @@ import fitz
 from multi_column import get_pages
 from io_utils import get_files_from_folder
 
+country_uk_gb_ni = "United Kingdom of Great Britain\nand Northern Ireland"
+
+def _str_contains_binary(text: str) -> bool:
+    return bool(re.search(r"(\\x\d{2}){2,}", text))
 
 def get_time_str(text: str) -> str:
+    # ! NOT USED YET, NEEDS TO BE CALLED IN GET_METADATA
     re_day = r"(?P<day>\d{1,2})"
     re_month = r"(?P<month>(\w+))"
     re_year = r"(?P<year>\d{4})"
@@ -65,8 +70,88 @@ def _is_communique_of_closed_meeting(page_zero) -> bool:
         return True
     return False
 
+def _get_metadata_substring_indices(text: str) -> dict[str, tuple[int, int]]:
+    metadata_to_regex = {
+        "president": r"President:(\n)?",
+        "members": r"Members:(\n)?",
+        "agenda": r"Agenda(\n)?",
+        "disclaimer": "This record .+",
+    }
+
+    matches = {}
+    for name, regex in metadata_to_regex.items():
+        matches[name] = re.search(regex, text)
+    
+    matches_indices = {}
+    matches_indices["header"] = (0, matches["president"].start())
+    matches_indices["president"] = (matches["president"].end(), matches["members"].start())
+    matches_indices["members"] = (matches["members"].end(), matches["agenda"].start())
+    matches_indices["agenda"] = (matches["agenda"].end(), matches["disclaimer"].start())
+    return matches_indices
+    
 
 def extract_metadata(first_page: dict[int, str]) -> dict[str, str]:
+    text = "\n".join(first_page)
+    # text = text.replace(
+    #     "United Kingdom of Great Britain\nand Northern Ireland",
+    #     "United Kingdom of Great Britain and Northern Ireland",
+    # )
+    text = text.replace(" \n", "\n")
+    # ! Note: Can extract more info from here still
+    speaker_to_country = {}
+
+    substring_indices = _get_metadata_substring_indices(text)
+
+    # Duplicates from below. Would be nice to have those in one place
+    # This will be the more up to date version of the two
+    regex_meeting_number = r"(?P<Meeting_Nr>\d{1,4})(st|nd|rd|th) [Mm]eeting"
+    title = r"(?P<Title>((Mr|Mr|Ms|Mrs).|Dame|Miss|Sir))"
+    person = r"(?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)"
+    country = fr"(?P<Country>[A-Za-zÀ-ȕ-\ ’()]+|{country_uk_gb_ni})"
+    aligner = r"( .)+ ?"
+    person_with_title = f"{title} ?{person}"
+
+    
+    # Other metadata:
+    header_text = text[substring_indices["header"][0]: substring_indices["header"][1]]
+    meeting_number_match = re.search(regex_meeting_number, header_text)
+    meeting_number = meeting_number_match.group("Meeting_Nr")
+
+    # President:
+    president_text = text[substring_indices["president"][0]: substring_indices["president"][1]]
+    president_match = re.search(person_with_title, president_text)
+    president = president_match.group(0)
+    president_country_match = re.search(f"\({country}\)", president_text)
+    president_country = president_country_match.group("Country")
+
+    speaker_to_country["The President"] = president_country
+
+    # Members:
+    members_text = text[substring_indices["members"][0]: substring_indices["members"][1]]
+    members_regex = f"{country}{aligner}\n?{person_with_title}"
+    for match in re.finditer(members_regex, members_text):
+        speaker_country = match.group("Country").strip()
+        speaker_name = match.group("Title") + " "+ match.group("Person")
+        speaker_to_country[speaker_name] = speaker_country
+
+    # Agenda:
+    # ! Probably the entire agenda_text
+    agenda_text = text[substring_indices["agenda"][0]: substring_indices["agenda"][1]]
+    agenda_match = re.search("((.|\n)+)($|\n)", agenda_text)
+    agenda = agenda_match.group(1)
+
+
+    metadata = {
+        "agenda": agenda,
+        "meeting_number": meeting_number,
+        "members": speaker_to_country,
+        "president": (president, president_country),
+    }
+
+    return metadata
+
+
+def extract_metadata_old(first_page: dict[int, str]) -> dict[str, str]:
     text = "\n".join(first_page)
     text = text.replace(
         "United Kingdom of Great Britain\nand Northern Ireland",
@@ -154,9 +239,9 @@ def get_text_indices_with_speakers(matches, text) -> list[tuple[str, str, str]]:
 
 
 def split_text_by_speakers(text: str) -> list[dict[str, str]]:
-    title = r"(?P<Title>((Mr|Mr|Ms).|Dame))"
-    person = r"(?P<Person>[A-Za-zÀ-ȕ\ ]+)"
-    country = r"(?P<Country>\([A-Za-zÀ-ȕ\ ]+\))"
+    title = r"(?P<Title>((Mr|Mr|Ms|Mrs).|Dame|Miss|Sir))"
+    person = r"(?P<Person>([A-Za-zÀ-ȕ-]+)( [A-Za-zÀ-ȕ-]+)*)"
+    country = r"(?P<Country>\([A-Za-zÀ-ȕ\ ]+\))" # surrounded by brackets
     language = r"(?P<Language>\(spoke in [A-Za-zÀ-ȕ\ ]+\))"
 
     speaker_regex = f"\n?(({title} ?{person} ?{country}?|The President) ?{language}?):"
@@ -204,6 +289,10 @@ def process_doc(doc) -> dict:
     if not pages[0]:
         print(f"Failed to extract {doc.name}")
         return {}
+    
+    if pages[0][0] and _str_contains_binary(pages[0][0]):
+        print(f"{doc.name} contains binary str")
+        return {}
 
     if pdf_type in ["transcript", "resumption"]:
         # TODO: Make metadata extraction dependent on PDF type
@@ -227,15 +316,15 @@ def process_doc(doc) -> dict:
 
 if __name__ == "__main__":
     files = get_files_from_folder("source")
-    files = ["S_PV.8995.pdf"]
+    # files = ["S_PV.9533.pdf"]
     extracted_folder = Path("extracted")
 
     for filename in files:
-        print(filename)
         doc = fitz.open(f"source/{filename}")
 
         report_dict = process_doc(doc)
         output_path = extracted_folder / f"{str(Path(filename).stem)}{'.json'}"
+        print(output_path)
 
         with open(output_path, "w") as f:
             dump = json.dumps(report_dict, indent=4, ensure_ascii=False).encode("utf-8")
